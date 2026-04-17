@@ -1,0 +1,9 @@
+# Executables
+main
+
+# macOS system files
+.DS_Store
+
+# Build directories (if you use them later)
+build/
+bin/
