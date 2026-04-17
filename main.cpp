@@ -181,6 +181,78 @@ std::string extractCondition(hsql::Expr* expr) {
     }
 }
 
+// Helper to extract JOIN condition as string (for ON clause)
+std::string extractJoinCondition(hsql::Expr* expr) {
+    if (!expr) return "";
+    return extractCondition(expr);
+}
+
+// Helper to extract table name from TableRef
+std::string extractTableName(const hsql::TableRef* tableRef) {
+    if (!tableRef) return "";
+    if (tableRef->type == hsql::kTableName && tableRef->name) {
+        return tableRef->name;
+    }
+    return "<table>";
+}
+
+// Recursively build RA tree from TableRef (handles nested JOINs)
+RANode* buildRAFromTableRef(const hsql::TableRef* tableRef) {
+    if (!tableRef) return nullptr;
+
+    switch (tableRef->type) {
+        case hsql::kTableName: {
+            // Base table
+            if (tableRef->name) {
+                return new TableNode(tableRef->name);
+            }
+            return nullptr;
+        }
+
+        case hsql::kTableJoin: {
+            // JOIN operation
+            const hsql::JoinDefinition* join = tableRef->join;
+            if (!join) return nullptr;
+
+            // Recursively build left and right sides
+            RANode* leftSide = buildRAFromTableRef(join->left);
+            RANode* rightSide = buildRAFromTableRef(join->right);
+
+            if (!leftSide || !rightSide) {
+                delete leftSide;
+                delete rightSide;
+                return nullptr;
+            }
+
+            // Extract JOIN condition
+            std::string joinCond = extractJoinCondition(join->condition);
+
+            // Determine JOIN type
+            std::string joinTypeStr = "";
+            switch (join->type) {
+                case hsql::kJoinInner: joinTypeStr = "INNER "; break;
+                case hsql::kJoinLeft: joinTypeStr = "LEFT "; break;
+                case hsql::kJoinRight: joinTypeStr = "RIGHT "; break;
+                case hsql::kJoinFull: joinTypeStr = "FULL "; break;
+                case hsql::kJoinCross: joinTypeStr = "CROSS "; break;
+                case hsql::kJoinNatural: joinTypeStr = "NATURAL "; break;
+                default: break;
+            }
+
+            // Build the JoinNode with join type in condition for clarity
+            std::string fullCondition = joinTypeStr + joinCond;
+            if (joinCond.empty()) {
+                fullCondition = joinTypeStr + "JOIN";
+            }
+
+            return new JoinNode(leftSide, rightSide, fullCondition);
+        }
+
+        default:
+            return nullptr;
+    }
+}
+
 // Main conversion function - parses SQL and returns RA tree
 RANode* parseSQLToRA(const std::string& query) {
     hsql::SQLParserResult result;
@@ -200,19 +272,19 @@ RANode* parseSQLToRA(const std::string& query) {
 
     auto selectStmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    // Build RA tree bottom-up
+    // Build RA tree top-down (root first, then children)
 
-    // 1. Create TableNode for FROM clause
-    TableNode* tableNode = nullptr;
-    if (selectStmt->fromTable && selectStmt->fromTable->name) {
-        tableNode = new TableNode(selectStmt->fromTable->name);
-    }
+    // 1. Build the table side (handles FROM with JOINs)
+    RANode* tableNode = buildRAFromTableRef(selectStmt->fromTable);
 
     // 2. Create ProjectNode for SELECT columns
     std::vector<std::string> selectCols = extractColumns(selectStmt->selectList);
     ProjectNode* projectNode = new ProjectNode(selectCols);
     if (tableNode) {
         projectNode->children.push_back(tableNode);
+    } else {
+        // If no table node (edge case), just return project
+        return projectNode;
     }
 
     // 3. Create SelectNode for WHERE clause if present
@@ -232,9 +304,18 @@ RANode* parseSQLToRA(const std::string& query) {
 int main() {
     // Test queries
     std::vector<std::string> queries = {
+        // Simple queries (no JOIN)
         "SELECT * FROM mytable;",
         "SELECT id, name FROM students WHERE id = 1;",
-        "SELECT * FROM orders WHERE amount > 100;"
+        "SELECT * FROM orders WHERE amount > 100;",
+
+        // JOIN queries
+        "SELECT * FROM students JOIN grades ON students.id = grades.student_id;",
+        "SELECT * FROM students INNER JOIN grades ON students.id = grades.student_id;",
+        "SELECT * FROM students LEFT JOIN grades ON students.id = grades.student_id;",
+        "SELECT students.name, courses.title FROM students JOIN enrollments ON students.id = enrollments.student_id JOIN courses ON enrollments.course_id = courses.id;",
+        "SELECT * FROM students JOIN grades ON students.id = grades.student_id WHERE grades.score > 90;",
+        "SELECT a.x, b.y FROM table_a AS a JOIN table_b AS b ON a.id = b.ref_id;",
     };
 
     for (const auto& query : queries) {
