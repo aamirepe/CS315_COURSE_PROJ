@@ -1,5 +1,7 @@
 # Executables
 main
+test_ra_tree
+test_optimizer
 
 # macOS system files
 .DS_Store
@@ -7,3 +9,8 @@ main
 # Build directories (if you use them later)
 build/
 bin/
+
+# Build artifacts
+*.so
+*.dylib
+*.a
