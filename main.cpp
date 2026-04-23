@@ -11,6 +11,7 @@
 #include "optimizer/Optimizer.h"
 #include "optimizer/JoinGraph.h"
 #include "optimizer/PlanNode.h"
+#include "optimizer/ExecutionEngine.h"
 
 // Helper function to collect table names from a plan subtree
 void collectTableNames(std::shared_ptr<PlanNode> node, std::vector<std::string>& tables) {
@@ -109,6 +110,24 @@ void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog&
         std::cout << "\nEstimated Cost: " << result.cost << "\n";
         std::cout << "Resulting Tuple Size: " << result.size << "\n";
         std::cout << "Best Algorithm Selected: " << result.bestAlg << "\n";
+
+        // --- Execute Query with Execution Engine ---
+        std::cout << "\n--- EXECUTION ENGINE RESULTS ---\n";
+        InMemoryDatabase execDb;
+        auto root = buildOperatorTree(*result.plan, execDb);
+        root->open();
+        Row* firstRow = root->next();
+        if (firstRow) {
+            std::cout << "First row columns: ";
+            for (auto& kv : *firstRow)
+                std::cout << kv.first << " ";
+            std::cout << std::endl;
+            delete firstRow;
+        } else {
+            std::cout << "No results.\n";
+        }
+        root->close();
+        std::cout << "-------------------------------\n";
     } else {
         std::cout << "Optimizer could not find a valid plan.\n";
     }
@@ -129,23 +148,23 @@ int main() {
     catalog.printStats();
 
     // Test Case 1: Simple Join with Filter (Tests Selection Push-Down)
-    runTestQuery(
-        "SELECT * FROM students JOIN grades ON students.id = grades.student_id WHERE students.age = 20",
-        optimizer, catalog
-    );
+    // runTestQuery(
+    //     "SELECT * FROM students JOIN grades ON students.id = grades.student_id WHERE students.age = 20",
+    //     optimizer, catalog
+    // );
 
     // Test Case 2: 3-Table Join (Tests Join Ordering and Left-Deep constraint)
-    runTestQuery(
-        "SELECT * FROM students JOIN enrollments ON students.id = enrollments.student_id JOIN courses ON enrollments.course_id = courses.id",
-        optimizer, catalog
-    );
+    // runTestQuery(
+    //     "SELECT * FROM students JOIN enrollments ON students.id = enrollments.student_id JOIN courses ON enrollments.course_id = courses.id",
+    //     optimizer, catalog
+    // );
 
-    // Test Case 3: Cross Product (Tests Penalty Heuristic)
-    // Note: Using comma syntax as the sql-parser doesn't support CROSS JOIN keyword
-    runTestQuery(
-        "SELECT * FROM students, courses",
-        optimizer, catalog
-    );
+    // // Test Case 3: Cross Product (Tests Penalty Heuristic)
+    // // Note: Using comma syntax as the sql-parser doesn't support CROSS JOIN keyword
+    // runTestQuery(
+    //     "SELECT * FROM students, courses",
+    //     optimizer, catalog
+    // );
 
     // Test Case 4: 4-Table Join with Multiple Conditions (Complex Query)
     runTestQuery(
@@ -157,14 +176,14 @@ int main() {
         optimizer, catalog
     );
 
-    // Test Case 5: 4-Table Join with Different Join Order
-    runTestQuery(
-        "SELECT * FROM courses "
-        "JOIN enrollments ON courses.id = enrollments.course_id "
-        "JOIN students ON enrollments.student_id = students.id "
-        "JOIN grades ON students.id = grades.student_id",
-        optimizer, catalog
-    );
+    // // Test Case 5: 4-Table Join with Different Join Order
+    // runTestQuery(
+    //     "SELECT * FROM courses "
+    //     "JOIN enrollments ON courses.id = enrollments.course_id "
+    //     "JOIN students ON enrollments.student_id = students.id "
+    //     "JOIN grades ON students.id = grades.student_id",
+    //     optimizer, catalog
+    // );
 
     return 0;
 }

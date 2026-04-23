@@ -75,7 +75,14 @@ public:
                     // In a real system, we'd parse the condition to see if it's an equality on a key
                     // For this project, we simulate a 10% selectivity for general filters
                     // and a higher selectivity for key matches.
-                    rows = rows / 10;
+                    // Parse column name from condition like "students.age = 20"
+                    size_t dotPos = cond.find('.');
+                    size_t eqPos = cond.find(' ');
+                    if (dotPos != std::string::npos && eqPos != std::string::npos) {
+                        std::string colName = cond.substr(dotPos + 1, eqPos - dotPos - 1);
+                        int64_t distinctVals = catalog->getDistinct(tableName, colName);
+                        if (distinctVals > 0) rows = rows / distinctVals;
+                    }
                     totalSelectionCost += (double)catalog->getRowCount(tableName) - rows;
                 }
             }
@@ -87,15 +94,27 @@ public:
 
         // Base case: single tables
         for (int i = 0; i < n; i++) {
-            int mask = 1 << i;
-            std::string tableName = tables[i];
-            int64_t rows = virtualSizes[tableName];
+    int mask = 1 << i;
+    std::string tableName = tables[i];
+    int64_t rows = virtualSizes[tableName];
 
-            auto scanNode = std::make_shared<PlanNode>(SCAN);
-            scanNode->tableName = tableName;
+    auto scanNode = std::make_shared<PlanNode>(SCAN);
+    scanNode->tableName = tableName;
 
-            dp[mask] = DPState(mask, 0.0, rows, scanNode, "SCAN", catalog->getSortedColumn(tableName));
+    // ADD THIS BLOCK ↓
+    std::shared_ptr<PlanNode> baseNode = scanNode;
+    for (const std::string& cond : graph.selection_conditions) {
+        if (cond.find(tableName) != std::string::npos) {
+            auto filterNode = std::make_shared<PlanNode>(FILTER);
+            filterNode->condition = cond;
+            filterNode->left = baseNode;
+            baseNode = filterNode;
         }
+    }
+    // ADD THIS BLOCK ↑
+
+    dp[mask] = DPState(mask, 0.0, rows, baseNode, "SCAN", catalog->getSortedColumn(tableName));
+}
 
         // Fill DP table for all subsets (process by increasing bit count)
         for (int bits = 2; bits <= n; bits++) {
