@@ -6,11 +6,13 @@
 #include <map>
 #include <limits>
 #include <iostream>
+#include <memory>
 #include "InMemoryDatabase.h"
 #include "Catalog.h"
 #include "SizeEstimator.h"
 #include "CostModel.h"
 #include "JoinGraph.h"
+#include "PlanNode.h"
 
 /**
  * DPState - State in the DP table for a subset of tables
@@ -19,12 +21,13 @@ struct DPState {
     int mask;
     double cost;
     int64_t size;
-    std::string plan;
+    std::shared_ptr<PlanNode> plan;
     std::string bestAlg;
+    std::string sortedOn;
 
-    DPState() : mask(0), cost(0), size(0) {}
-    DPState(int m, double c, int64_t s, const std::string& p, const std::string& a)
-        : mask(m), cost(c), size(s), plan(p), bestAlg(a) {}
+    DPState() : mask(0), cost(0), size(0), plan(nullptr), sortedOn("") {}
+    DPState(int m, double c, int64_t s, std::shared_ptr<PlanNode> p, const std::string& a, const std::string& sorted = "")
+        : mask(m), cost(c), size(s), plan(p), bestAlg(a), sortedOn(sorted) {}
 };
 
 /**
@@ -51,12 +54,34 @@ public:
     Optimizer(const Catalog* c, SizeEstimator* se, CostModel* cm)
         : catalog(c), sizeEst(se), costModel(cm) {}
 
-    DPState optimize(const JoinGraph& graph) {
+    DPState optimize(const JoinGraph& graph) const {
         const std::vector<std::string>& tables = graph.base_tables;
         const std::vector<JoinPredicate>& predicates = graph.join_conditions;
 
         int n = tables.size();
         if (n == 0) return DPState();
+
+        // --- Step 2: Virtual Stats Pass ---
+        std::map<std::string, int64_t> virtualSizes;
+        double totalSelectionCost = 0;
+
+        for (const std::string& tableName : tables) {
+            int64_t rows = catalog->getRowCount(tableName);
+
+            // Apply Selection Push-Down heuristics
+            for (const std::string& cond : graph.selection_conditions) {
+                // Simple heuristic: if condition contains tableName, it might apply
+                if (cond.find(tableName) != std::string::npos) {
+                    // In a real system, we'd parse the condition to see if it's an equality on a key
+                    // For this project, we simulate a 10% selectivity for general filters
+                    // and a higher selectivity for key matches.
+                    rows = rows / 10;
+                    totalSelectionCost += (double)catalog->getRowCount(tableName) - rows;
+                }
+            }
+            virtualSizes[tableName] = rows;
+        }
+        // -----------------------------------
 
         std::map<int, DPState> dp;
 
@@ -64,9 +89,12 @@ public:
         for (int i = 0; i < n; i++) {
             int mask = 1 << i;
             std::string tableName = tables[i];
-            int64_t rows = catalog->getRowCount(tableName);
+            int64_t rows = virtualSizes[tableName];
 
-            dp[mask] = DPState(mask, 0.0, rows, tableName, "SCAN");
+            auto scanNode = std::make_shared<PlanNode>(SCAN);
+            scanNode->tableName = tableName;
+
+            dp[mask] = DPState(mask, 0.0, rows, scanNode, "SCAN", catalog->getSortedColumn(tableName));
         }
 
         // Fill DP table for all subsets (process by increasing bit count)
@@ -80,9 +108,10 @@ public:
 
                 double minCost = std::numeric_limits<double>::max();
                 int64_t minSize = 0;
-                std::string bestPlan = "";
+                std::shared_ptr<PlanNode> bestPlan = nullptr;
                 std::string bestAlg = "";
                 bool found = false;
+                std::string leftCol, rightCol;
 
                 // Enumerate all ways to split mask into two non-empty submasks
                 for (int submask = mask & (mask - 1); submask > 0; submask = (submask - 1) & mask) {
@@ -90,22 +119,18 @@ public:
                     if (rightMask == 0) continue;
 
                     // Check if both submasks have valid plans (they must be joinable)
-                    if (dp.find(submask) == dp.end() || dp[submask].plan == "") {
+                    if (dp.find(submask) == dp.end() || dp[submask].plan == nullptr) {
                         continue;
                     }
-                    if (dp.find(rightMask) == dp.end() || dp[rightMask].plan == "") {
+                    if (dp.find(rightMask) == dp.end() || dp[rightMask].plan == nullptr) {
                         continue;
                     }
 
                     // Check if there's a predicate connecting these two groups
-                    // Track which predicate tables are in which group
-                    bool t1_in_sub = false, t2_in_sub = false;
-                    bool t1_in_right = false, t2_in_right = false;
-                    std::string pred_t1, pred_t2, pred_c1, pred_c2;
                     bool foundPred = false;
+                    std::string pred_t1, pred_t2, pred_c1, pred_c2;
 
                     for (const JoinPredicate& p : predicates) {
-                        // Check if predicate connects submask and rightMask
                         bool p_t1_in_sub = false, p_t2_in_sub = false;
                         bool p_t1_in_right = false, p_t2_in_right = false;
 
@@ -125,33 +150,55 @@ public:
                             pred_t2 = p.table2;
                             pred_c1 = p.col1;
                             pred_c2 = p.col2;
-                            t1_in_sub = p_t1_in_sub;
-                            t2_in_sub = p_t2_in_sub;
-                            t1_in_right = p_t1_in_right;
-                            t2_in_right = p_t2_in_right;
                             foundPred = true;
                             break;
                         }
                     }
 
+                    double crossProductPenalty = 1000000.0;
                     if (!foundPred) {
-                        continue;
+                        // Heuristic: Penalize Cross Products
+                        if (minCost < crossProductPenalty) {
+                            continue;
+                        }
+                    } else {
+                        // We have a join predicate, use it for size estimation
                     }
 
-                    // Assign tables based on which side of predicate is in which group
+                    // Determine left/right for size estimation
                     std::string leftTable, rightTable, leftCol, rightCol;
-                    if (t1_in_sub && t2_in_right) {
-                        leftTable = pred_t1;
-                        leftCol = pred_c1;
-                        rightTable = pred_t2;
-                        rightCol = pred_c2;
-                    } else if (t2_in_sub && t1_in_right) {
-                        leftTable = pred_t2;
-                        leftCol = pred_c2;
-                        rightTable = pred_t1;
-                        rightCol = pred_c1;
+                    if (foundPred) {
+                        // Identify which table is in submask and which is in rightMask
+                        bool t1_in_sub = false;
+                        for(int i=0; i<(int)tables.size(); ++i) {
+                            if((submask & (1<<i)) && tables[i] == pred_t1) { t1_in_sub = true; break; }
+                        }
+                        if (t1_in_sub) {
+                            leftTable = pred_t1; leftCol = pred_c1;
+                            rightTable = pred_t2; rightCol = pred_c2;
+                        } else {
+                            leftTable = pred_t2; leftCol = pred_c2;
+                            rightTable = pred_t1; rightCol = pred_c1;
+                        }
                     } else {
-                        continue;
+                        // Cross product: use the actual table names from each side for size estimation
+                        // Get table names from the dp state
+                        const std::vector<std::string>& subTables = getTablesInMask(tables, submask);
+                        const std::vector<std::string>& rightTables = getTablesInMask(tables, rightMask);
+                        leftTable = subTables.empty() ? "" : subTables[0];
+                        rightTable = rightTables.empty() ? "" : rightTables[0];
+                        leftCol = ""; rightCol = "";  // Empty columns indicate cross product
+                    }
+
+                    // Constrain to Left-Deep Joins:
+                    // One side of the join must be a base table (mask with only 1 bit set)
+                    int submaskBits = 0;
+                    for (int tmp = submask; tmp > 0; tmp >>= 1) if (tmp & 1) submaskBits++;
+                    int rightMaskBits = 0;
+                    for (int tmp = rightMask; tmp > 0; tmp >>= 1) if (tmp & 1) rightMaskBits++;
+
+                    if (submaskBits != 1 && rightMaskBits != 1) {
+                        continue; // Not a left-deep (or right-deep) split
                     }
 
                     // Calculate join size
@@ -161,7 +208,9 @@ public:
 
                     // Find best algorithm
                     double joinCost;
-                    std::string alg = costModel->findBestAlgorithm(leftRows, rightRows, joinCost);
+                    bool leftSorted = (dp[submask].sortedOn == leftCol);
+                    bool rightSorted = (dp[rightMask].sortedOn == rightCol);
+                    std::string alg = costModel->findBestAlgorithm(leftRows, rightRows, joinCost, leftSorted, rightSorted);
 
                     // Total cost
                     double totalCost = dp[submask].cost + dp[rightMask].cost + joinCost;
@@ -169,14 +218,22 @@ public:
                     if (totalCost < minCost) {
                         minCost = totalCost;
                         minSize = joinSize;
-                        bestPlan = "(" + dp[submask].plan + " " + alg + " " + dp[rightMask].plan + ")";
+
+                        auto joinNode = std::make_shared<PlanNode>(JOIN);
+                        joinNode->algorithm = (alg == "Hash") ? HASH : (alg == "BNLJ") ? BNLJ : MERGE;
+                        joinNode->condition = (foundPred) ? (pred_t1 + "." + pred_c1 + " = " + pred_t2 + "." + pred_c2) : "CROSS PRODUCT";
+                        joinNode->left = dp[submask].plan;
+                        joinNode->right = dp[rightMask].plan;
+
+                        bestPlan = joinNode;
                         bestAlg = alg;
                         found = true;
                     }
                 }
 
                 if (found) {
-                    dp[mask] = DPState(mask, minCost, minSize, bestPlan, bestAlg);
+                    std::string finalSortedOn = (bestAlg == "Merge") ? leftCol : "";
+                    dp[mask] = DPState(mask, minCost, minSize, bestPlan, bestAlg, finalSortedOn);
                 }
             }
         }

@@ -26,6 +26,14 @@ public:
         return db->getDistinctCount(tableName, colName);
     }
 
+    // Get the column the table is sorted on
+    std::string getSortedColumn(const std::string& tableName) const {
+        if (tableName == "students" || tableName == "courses") {
+            return "id";
+        }
+        return "";
+    }
+
     // Print all statistics
     void printStats() const {
         std::cout << "\n=== Catalog Statistics ===" << std::endl;

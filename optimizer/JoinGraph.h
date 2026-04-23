@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <map>
 
 /**
  * JoinPredicate - A join condition between two tables
@@ -28,6 +29,8 @@ struct JoinPredicate {
 struct JoinGraph {
     std::vector<std::string> base_tables;
     std::vector<JoinPredicate> join_conditions;
+    std::vector<std::string> selection_conditions;
+    std::map<std::string, std::vector<std::string>> required_columns;
 };
 
 /**
