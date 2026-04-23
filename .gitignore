@@ -14,3 +14,6 @@ bin/
 *.so
 *.dylib
 *.a
+furydb
+optimizer_test
+test_ra_tree
