@@ -81,6 +81,8 @@ void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog&
     if (query.find("grades") != std::string::npos) graph.base_tables.push_back("grades");
     if (query.find("courses") != std::string::npos) graph.base_tables.push_back("courses");
     if (query.find("enrollments") != std::string::npos) graph.base_tables.push_back("enrollments");
+    if (query.find("huge_users") != std::string::npos) graph.base_tables.push_back("huge_users");
+    if (query.find("huge_transactions") != std::string::npos) graph.base_tables.push_back("huge_transactions");
 
     // Mocking join conditions based on common test patterns
     if (query.find("students.id = grades.student_id") != std::string::npos) {
@@ -91,6 +93,9 @@ void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog&
     }
     if (query.find("students.id = enrollments.student_id") != std::string::npos) {
         graph.join_conditions.emplace_back("students", "id", "enrollments", "student_id");
+    }
+    if (query.find("huge_users.id = huge_transactions.user_id") != std::string::npos) {
+        graph.join_conditions.emplace_back("huge_users", "id", "huge_transactions", "user_id");
     }
 
     // Mocking Selection conditions (WHERE clause)
@@ -161,6 +166,15 @@ int main() {
         if (pipePos != std::string::npos) {
             std::string testId = line.substr(0, pipePos);
             std::string query = line.substr(pipePos + 1);
+
+            if (testId == "TC11_Sorted") {
+                catalog.setSortedColumn("huge_users", "id");
+                catalog.setSortedColumn("huge_transactions", "user_id");
+            } else {
+                catalog.removeSortedColumn("huge_users");
+                catalog.removeSortedColumn("huge_transactions");
+            }
+
             std::ofstream outFile(testId + ".out");
             if (outFile.is_open()) {
                 runTestQuery(query, optimizer, catalog, outFile);

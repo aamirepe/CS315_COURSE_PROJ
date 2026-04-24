@@ -16,6 +16,12 @@ private:
 public:
     Catalog(const InMemoryDatabase* database) : db(database) {}
 
+    // Dynamic column tracking
+    std::map<std::string, std::string> sortedColumns = {
+        {"students", "id"},
+        {"courses", "id"}
+    };
+
     // Get row count for a table
     int64_t getRowCount(const std::string& tableName) const {
         return db->getRowCount(tableName);
@@ -28,10 +34,17 @@ public:
 
     // Get the column the table is sorted on
     std::string getSortedColumn(const std::string& tableName) const {
-        if (tableName == "students" || tableName == "courses") {
-            return "id";
-        }
+        auto it = sortedColumns.find(tableName);
+        if (it != sortedColumns.end()) return it->second;
         return "";
+    }
+
+    void setSortedColumn(const std::string& tableName, const std::string& col) {
+        sortedColumns[tableName] = col;
+    }
+    
+    void removeSortedColumn(const std::string& tableName) {
+        sortedColumns.erase(tableName);
     }
 
     // Print all statistics

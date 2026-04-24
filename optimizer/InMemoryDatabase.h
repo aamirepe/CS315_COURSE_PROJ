@@ -100,6 +100,30 @@ public:
             courses.push_back(r);
         }
         db["courses"] = courses;
+        // ==========================================
+        // MASSIVE TABLES FOR OPTIMIZER TESTING
+        // ==========================================
+        
+        // huge_users (100,000 rows -> 1,000 blocks)
+        Table huge_users;
+        for (int i = 1; i <= 100000; i++) {
+            Row r;
+            r["id"] = std::to_string(i);
+            r["region"] = "Region" + std::to_string(i % 50);
+            huge_users.push_back(r);
+        }
+        db["huge_users"] = huge_users;
+
+        // huge_transactions (500,000 rows -> 5,000 blocks)
+        Table huge_tx;
+        for (int i = 1; i <= 500000; i++) {
+            Row r;
+            r["tx_id"] = std::to_string(i);
+            r["user_id"] = std::to_string(1 + (i % 100000));
+            r["amount"] = std::to_string(10 + (i % 900));
+            huge_tx.push_back(r);
+        }
+        db["huge_transactions"] = huge_tx;
     }
 
     // Get table by name

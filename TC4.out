@@ -1,6 +1,6 @@
 
 ==================================================================
-TEST QUERY: SELECT * FROM courses WHERE id = 2
+TEST QUERY: SELECT * FROM courses WHERE id = CS2
 ------------------------------------------------------------------
 Optimizer is processing heuristics and DP...
 
@@ -13,5 +13,7 @@ Resulting Tuple Size: 10
 Best Algorithm Selected: SCAN
 
 --- EXECUTION ENGINE RESULTS ---
-No results.
+courses.id	courses.title	
+CS2	Course2	
+1 row(s) returned.
 -------------------------------

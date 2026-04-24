@@ -7,104 +7,15 @@ Optimizer is processing heuristics and DP...
 OPTIMAL PHYSICAL PLAN (Tree):
 
 JOIN SEQUENCE (Order of Operations):
-  Join 1: [enrollments] X [courses] ON enrollments.course_id = courses.id (HashJoin)
-  Join 2: [enrollments,courses] X [students] ON enrollments.student_id = students.id (HashJoin)
+  Join 1: [enrollments] X [courses] ON enrollments.course_id = courses.id (BNLJ)
+  Join 2: [enrollments,courses] X [students] ON enrollments.student_id = students.id (BNLJ)
 
-Estimated Cost: 930
+Estimated Cost: 40.4
 Resulting Tuple Size: 100
-Best Algorithm Selected: Hash
+Best Algorithm Selected: BNLJ
 
 --- EXECUTION ENGINE RESULTS ---
 courses.id	courses.title	enrollments.course_id	enrollments.semester	enrollments.student_id	students.age	students.id	students.name	
 CS1	Course1	CS1	Fall2024	2	20	2	Student2	
-CS2	Course2	CS2	Fall2024	3	21	3	Student3	
-CS3	Course3	CS3	Fall2024	4	22	4	Student4	
-CS4	Course4	CS4	Fall2024	5	18	5	Student5	
-CS5	Course5	CS5	Fall2024	6	19	6	Student6	
-CS6	Course6	CS6	Fall2024	7	20	7	Student7	
-CS7	Course7	CS7	Fall2024	8	21	8	Student8	
-CS8	Course8	CS8	Fall2024	9	22	9	Student9	
-CS9	Course9	CS9	Fall2024	10	18	10	Student10	
-CS1	Course1	CS1	Fall2024	12	20	12	Student12	
-CS2	Course2	CS2	Fall2024	13	21	13	Student13	
-CS3	Course3	CS3	Fall2024	14	22	14	Student14	
-CS4	Course4	CS4	Fall2024	15	18	15	Student15	
-CS5	Course5	CS5	Fall2024	16	19	16	Student16	
-CS6	Course6	CS6	Fall2024	17	20	17	Student17	
-CS7	Course7	CS7	Fall2024	18	21	18	Student18	
-CS8	Course8	CS8	Fall2024	19	22	19	Student19	
-CS9	Course9	CS9	Fall2024	20	18	20	Student20	
-CS1	Course1	CS1	Fall2024	22	20	22	Student22	
-CS2	Course2	CS2	Fall2024	23	21	23	Student23	
-CS3	Course3	CS3	Fall2024	24	22	24	Student24	
-CS4	Course4	CS4	Fall2024	25	18	25	Student25	
-CS5	Course5	CS5	Fall2024	26	19	26	Student26	
-CS6	Course6	CS6	Fall2024	27	20	27	Student27	
-CS7	Course7	CS7	Fall2024	28	21	28	Student28	
-CS8	Course8	CS8	Fall2024	29	22	29	Student29	
-CS9	Course9	CS9	Fall2024	30	18	30	Student30	
-CS1	Course1	CS1	Fall2024	32	20	32	Student32	
-CS2	Course2	CS2	Fall2024	33	21	33	Student33	
-CS3	Course3	CS3	Fall2024	34	22	34	Student34	
-CS4	Course4	CS4	Fall2024	35	18	35	Student35	
-CS5	Course5	CS5	Fall2024	36	19	36	Student36	
-CS6	Course6	CS6	Fall2024	37	20	37	Student37	
-CS7	Course7	CS7	Fall2024	38	21	38	Student38	
-CS8	Course8	CS8	Fall2024	39	22	39	Student39	
-CS9	Course9	CS9	Fall2024	40	18	40	Student40	
-CS1	Course1	CS1	Fall2024	42	20	42	Student42	
-CS2	Course2	CS2	Fall2024	43	21	43	Student43	
-CS3	Course3	CS3	Fall2024	44	22	44	Student44	
-CS4	Course4	CS4	Fall2024	45	18	45	Student45	
-CS5	Course5	CS5	Fall2024	46	19	46	Student46	
-CS6	Course6	CS6	Fall2024	47	20	47	Student47	
-CS7	Course7	CS7	Fall2024	48	21	48	Student48	
-CS8	Course8	CS8	Fall2024	49	22	49	Student49	
-CS9	Course9	CS9	Fall2024	50	18	50	Student50	
-CS1	Course1	CS1	Fall2024	52	20	52	Student52	
-CS2	Course2	CS2	Fall2024	53	21	53	Student53	
-CS3	Course3	CS3	Fall2024	54	22	54	Student54	
-CS4	Course4	CS4	Fall2024	55	18	55	Student55	
-CS5	Course5	CS5	Fall2024	56	19	56	Student56	
-CS6	Course6	CS6	Fall2024	57	20	57	Student57	
-CS7	Course7	CS7	Fall2024	58	21	58	Student58	
-CS8	Course8	CS8	Fall2024	59	22	59	Student59	
-CS9	Course9	CS9	Fall2024	60	18	60	Student60	
-CS1	Course1	CS1	Fall2024	62	20	62	Student62	
-CS2	Course2	CS2	Fall2024	63	21	63	Student63	
-CS3	Course3	CS3	Fall2024	64	22	64	Student64	
-CS4	Course4	CS4	Fall2024	65	18	65	Student65	
-CS5	Course5	CS5	Fall2024	66	19	66	Student66	
-CS6	Course6	CS6	Fall2024	67	20	67	Student67	
-CS7	Course7	CS7	Fall2024	68	21	68	Student68	
-CS8	Course8	CS8	Fall2024	69	22	69	Student69	
-CS9	Course9	CS9	Fall2024	70	18	70	Student70	
-CS1	Course1	CS1	Fall2024	72	20	72	Student72	
-CS2	Course2	CS2	Fall2024	73	21	73	Student73	
-CS3	Course3	CS3	Fall2024	74	22	74	Student74	
-CS4	Course4	CS4	Fall2024	75	18	75	Student75	
-CS5	Course5	CS5	Fall2024	76	19	76	Student76	
-CS6	Course6	CS6	Fall2024	77	20	77	Student77	
-CS7	Course7	CS7	Fall2024	78	21	78	Student78	
-CS8	Course8	CS8	Fall2024	79	22	79	Student79	
-CS9	Course9	CS9	Fall2024	80	18	80	Student80	
-CS1	Course1	CS1	Fall2024	82	20	82	Student82	
-CS2	Course2	CS2	Fall2024	83	21	83	Student83	
-CS3	Course3	CS3	Fall2024	84	22	84	Student84	
-CS4	Course4	CS4	Fall2024	85	18	85	Student85	
-CS5	Course5	CS5	Fall2024	86	19	86	Student86	
-CS6	Course6	CS6	Fall2024	87	20	87	Student87	
-CS7	Course7	CS7	Fall2024	88	21	88	Student88	
-CS8	Course8	CS8	Fall2024	89	22	89	Student89	
-CS9	Course9	CS9	Fall2024	90	18	90	Student90	
-CS1	Course1	CS1	Fall2024	92	20	92	Student92	
-CS2	Course2	CS2	Fall2024	93	21	93	Student93	
-CS3	Course3	CS3	Fall2024	94	22	94	Student94	
-CS4	Course4	CS4	Fall2024	95	18	95	Student95	
-CS5	Course5	CS5	Fall2024	96	19	96	Student96	
-CS6	Course6	CS6	Fall2024	97	20	97	Student97	
-CS7	Course7	CS7	Fall2024	98	21	98	Student98	
-CS8	Course8	CS8	Fall2024	99	22	99	Student99	
-CS9	Course9	CS9	Fall2024	100	18	100	Student100	
-90 row(s) returned.
+1 row(s) returned.
 -------------------------------
