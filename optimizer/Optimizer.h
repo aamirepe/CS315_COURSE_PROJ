@@ -104,7 +104,7 @@ public:
     // ADD THIS BLOCK ↓
     std::shared_ptr<PlanNode> baseNode = scanNode;
     for (const std::string& cond : graph.selection_conditions) {
-        if (cond.find(tableName) != std::string::npos) {
+        if (cond.find(tableName) != std::string::npos || tables.size() == 1) {
             auto filterNode = std::make_shared<PlanNode>(FILTER);
             filterNode->condition = cond;
             filterNode->left = baseNode;
@@ -240,7 +240,7 @@ public:
 
                         auto joinNode = std::make_shared<PlanNode>(JOIN);
                         joinNode->algorithm = (alg == "Hash") ? HASH : (alg == "BNLJ") ? BNLJ : MERGE;
-                        joinNode->condition = (foundPred) ? (pred_t1 + "." + pred_c1 + " = " + pred_t2 + "." + pred_c2) : "CROSS PRODUCT";
+                        joinNode->condition = (foundPred) ? (leftTable + "." + leftCol + " = " + rightTable + "." + rightCol) : "CROSS PRODUCT";
                         joinNode->left = dp[submask].plan;
                         joinNode->right = dp[rightMask].plan;
 

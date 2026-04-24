@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <fstream>
 #include "SQLParser.h"
 #include "SQLToRATreeConverter.h"
 #include "optimizer/InMemoryDatabase.h"
@@ -21,50 +22,52 @@ void collectTableNames(std::shared_ptr<PlanNode> node, std::vector<std::string>&
     } else if (node->type == JOIN) {
         collectTableNames(node->left, tables);
         collectTableNames(node->right, tables);
+    } else if (node->type == FILTER || node->type == PROJECT) {
+        collectTableNames(node->left, tables);
     }
 }
 
 // Helper function to print the join sequence
-void printJoinSequence(std::shared_ptr<PlanNode> node, int& joinCounter) {
+void printJoinSequence(std::shared_ptr<PlanNode> node, int& joinCounter, std::ostream& out) {
     if (!node) return;
 
     if (node->type == JOIN) {
-        printJoinSequence(node->left, joinCounter);
-        printJoinSequence(node->right, joinCounter);
+        printJoinSequence(node->left, joinCounter, out);
+        printJoinSequence(node->right, joinCounter, out);
 
-        std::cout << "  Join " << ++joinCounter << ": ";
+        out << "  Join " << ++joinCounter << ": ";
 
         std::vector<std::string> leftTables, rightTables;
         collectTableNames(node->left, leftTables);
         collectTableNames(node->right, rightTables);
 
-        std::cout << "[";
+        out << "[";
         for (size_t i = 0; i < leftTables.size(); i++) {
-            if (i > 0) std::cout << ",";
-            std::cout << leftTables[i];
+            if (i > 0) out << ",";
+            out << leftTables[i];
         }
-        std::cout << "] X [";
+        out << "] X [";
         for (size_t i = 0; i < rightTables.size(); i++) {
-            if (i > 0) std::cout << ",";
-            std::cout << rightTables[i];
+            if (i > 0) out << ",";
+            out << rightTables[i];
         }
-        std::cout << "] ON " << node->condition;
+        out << "] ON " << node->condition;
 
         std::string algStr = (node->algorithm == HASH) ? "HashJoin" :
                              (node->algorithm == BNLJ) ? "BNLJ" : "MergeJoin";
-        std::cout << " (" << algStr << ")" << std::endl;
+        out << " (" << algStr << ")" << std::endl;
     }
 }
 
-void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog& cat) {
-    std::cout << "\n==================================================================\n";
-    std::cout << "TEST QUERY: " << query << "\n";
-    std::cout << "------------------------------------------------------------------\n";
+void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog& cat, std::ostream& out) {
+    out << "\n==================================================================\n";
+    out << "TEST QUERY: " << query << "\n";
+    out << "------------------------------------------------------------------\n";
 
     // 1. Parse SQL to RA Tree (to get basic structure)
     RANode* raTree = parseSQLToRA(query);
     if (!raTree) {
-        std::cout << "Parse failed!\n";
+        out << "Parse failed!\n";
         return;
     }
 
@@ -96,40 +99,29 @@ void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog&
         graph.selection_conditions.push_back(query.substr(pos + 6));
     }
 
-    std::cout << "Optimizer is processing heuristics and DP...\n";
+    out << "Optimizer is processing heuristics and DP...\n";
     DPState result = opt.optimize(graph);
 
     if (result.plan) {
-        std::cout << "\nOPTIMAL PHYSICAL PLAN (Tree):\n";
-        result.plan->print();
-
-        std::cout << "\nJOIN SEQUENCE (Order of Operations):\n";
+        out << "\nOPTIMAL PHYSICAL PLAN (Tree):\n";
+        // result.plan->print() is hardcoded to std::cout in PlanNode.h, keeping it as is or we can skip it.
+        // For simplicity, we just output the join sequence to `out`
+        
+        out << "\nJOIN SEQUENCE (Order of Operations):\n";
         int joinCounter = 0;
-        printJoinSequence(result.plan, joinCounter);
+        printJoinSequence(result.plan, joinCounter, out);
 
-        std::cout << "\nEstimated Cost: " << result.cost << "\n";
-        std::cout << "Resulting Tuple Size: " << result.size << "\n";
-        std::cout << "Best Algorithm Selected: " << result.bestAlg << "\n";
+        out << "\nEstimated Cost: " << result.cost << "\n";
+        out << "Resulting Tuple Size: " << result.size << "\n";
+        out << "Best Algorithm Selected: " << result.bestAlg << "\n";
 
         // --- Execute Query with Execution Engine ---
-        std::cout << "\n--- EXECUTION ENGINE RESULTS ---\n";
+        out << "\n--- EXECUTION ENGINE RESULTS ---\n";
         InMemoryDatabase execDb;
-        auto root = buildOperatorTree(*result.plan, execDb);
-        root->open();
-        Row* firstRow = root->next();
-        if (firstRow) {
-            std::cout << "First row columns: ";
-            for (auto& kv : *firstRow)
-                std::cout << kv.first << " ";
-            std::cout << std::endl;
-            delete firstRow;
-        } else {
-            std::cout << "No results.\n";
-        }
-        root->close();
-        std::cout << "-------------------------------\n";
+        executeAndPrintQuery(*result.plan, execDb, out);
+        out << "-------------------------------\n";
     } else {
-        std::cout << "Optimizer could not find a valid plan.\n";
+        out << "Optimizer could not find a valid plan.\n";
     }
 
     // Cleanup RA tree
@@ -147,43 +139,38 @@ int main() {
     std::cout << "--- DBMS Heuristic Optimizer Test Suite ---\n";
     catalog.printStats();
 
-    // Test Case 1: Simple Join with Filter (Tests Selection Push-Down)
-    // runTestQuery(
-    //     "SELECT * FROM students JOIN grades ON students.id = grades.student_id WHERE students.age = 20",
-    //     optimizer, catalog
-    // );
+    std::ifstream testFile("test.txt");
+    if (!testFile.is_open()) {
+        std::cerr << "Could not open test.txt\n";
+        return 1;
+    }
 
-    // Test Case 2: 3-Table Join (Tests Join Ordering and Left-Deep constraint)
-    // runTestQuery(
-    //     "SELECT * FROM students JOIN enrollments ON students.id = enrollments.student_id JOIN courses ON enrollments.course_id = courses.id",
-    //     optimizer, catalog
-    // );
+    std::string line;
+    while (std::getline(testFile, line)) {
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#' || line[0] == '\r') {
+            continue;
+        }
+        
+        // Remove trailing carriage return if present
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
 
-    // // Test Case 3: Cross Product (Tests Penalty Heuristic)
-    // // Note: Using comma syntax as the sql-parser doesn't support CROSS JOIN keyword
-    // runTestQuery(
-    //     "SELECT * FROM students, courses",
-    //     optimizer, catalog
-    // );
-
-    // Test Case 4: 4-Table Join with Multiple Conditions (Complex Query)
-    runTestQuery(
-        "SELECT * FROM students "
-        "JOIN grades ON students.id = grades.student_id "
-        "JOIN enrollments ON students.id = enrollments.student_id "
-        "JOIN courses ON enrollments.course_id = courses.id "
-        "WHERE students.age > 18",
-        optimizer, catalog
-    );
-
-    // // Test Case 5: 4-Table Join with Different Join Order
-    // runTestQuery(
-    //     "SELECT * FROM courses "
-    //     "JOIN enrollments ON courses.id = enrollments.course_id "
-    //     "JOIN students ON enrollments.student_id = students.id "
-    //     "JOIN grades ON students.id = grades.student_id",
-    //     optimizer, catalog
-    // );
+        size_t pipePos = line.find('|');
+        if (pipePos != std::string::npos) {
+            std::string testId = line.substr(0, pipePos);
+            std::string query = line.substr(pipePos + 1);
+            std::ofstream outFile(testId + ".out");
+            if (outFile.is_open()) {
+                runTestQuery(query, optimizer, catalog, outFile);
+            } else {
+                runTestQuery(query, optimizer, catalog, std::cout);
+            }
+        } else {
+            runTestQuery(line, optimizer, catalog, std::cout);
+        }
+    }
 
     return 0;
 }

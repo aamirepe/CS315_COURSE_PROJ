@@ -1,0 +1,17 @@
+
+==================================================================
+TEST QUERY: SELECT * FROM courses WHERE id = 2
+------------------------------------------------------------------
+Optimizer is processing heuristics and DP...
+
+OPTIMAL PHYSICAL PLAN (Tree):
+
+JOIN SEQUENCE (Order of Operations):
+
+Estimated Cost: 0
+Resulting Tuple Size: 10
+Best Algorithm Selected: SCAN
+
+--- EXECUTION ENGINE RESULTS ---
+No results.
+-------------------------------

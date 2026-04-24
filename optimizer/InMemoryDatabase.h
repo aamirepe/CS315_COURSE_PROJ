@@ -82,7 +82,7 @@ public:
 
         // enrollments(student_id, course_id, semester)
         Table enrollments;
-        for (int i = 1; i <= 300; i++) {
+        for (int i = 1; i <= 100; i++) {
             Row r;
             r["student_id"] = std::to_string(1 + (i % 100));
             r["course_id"] = "CS" + std::to_string(i % 10);
@@ -95,7 +95,7 @@ public:
         Table courses;
         for (int i = 1; i <= 10; i++) {
             Row r;
-            r["id"] = std::to_string(i);
+            r["id"] = "CS" + std::to_string(i);
             r["title"] = "Course" + std::to_string(i);
             courses.push_back(r);
         }
