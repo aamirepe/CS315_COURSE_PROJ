@@ -58,6 +58,14 @@ public:
         const std::vector<std::string>& tables = graph.base_tables;
         const std::vector<JoinPredicate>& predicates = graph.join_conditions;
 
+        // join graph looks like this 
+        // struct JoinGraph {
+        //     std::vector<std::string> base_tables;
+        //     std::vector<JoinPredicate> join_conditions;
+        //     std::vector<std::string> selection_conditions;
+        //     std::map<std::string, std::vector<std::string>> required_columns;
+        // };
+
         int n = tables.size();
         if (n == 0) return DPState();
 
@@ -67,7 +75,7 @@ public:
 
         for (const std::string& tableName : tables) {
             int64_t rows = catalog->getRowCount(tableName);
-
+            
             // Apply Selection Push-Down heuristics
             for (const std::string& cond : graph.selection_conditions) {
                 // Simple heuristic: if condition contains tableName, it might apply
@@ -94,27 +102,27 @@ public:
 
         // Base case: single tables
         for (int i = 0; i < n; i++) {
-    int mask = 1 << i;
-    std::string tableName = tables[i];
-    int64_t rows = virtualSizes[tableName];
+            int mask = 1 << i;
+            std::string tableName = tables[i];
+            int64_t rows = virtualSizes[tableName];
 
-    auto scanNode = std::make_shared<PlanNode>(SCAN);
-    scanNode->tableName = tableName;
+            auto scanNode = std::make_shared<PlanNode>(SCAN);
+            scanNode->tableName = tableName;
 
-    // ADD THIS BLOCK ↓
-    std::shared_ptr<PlanNode> baseNode = scanNode;
-    for (const std::string& cond : graph.selection_conditions) {
-        if (cond.find(tableName) != std::string::npos || tables.size() == 1) {
-            auto filterNode = std::make_shared<PlanNode>(FILTER);
-            filterNode->condition = cond;
-            filterNode->left = baseNode;
-            baseNode = filterNode;
+
+            std::shared_ptr<PlanNode> baseNode = scanNode;
+            for (const std::string& cond : graph.selection_conditions) {
+                if (cond.find(tableName) != std::string::npos) {
+                    auto filterNode = std::make_shared<PlanNode>(FILTER);
+                    filterNode->condition = cond;
+                    filterNode->left = baseNode;
+                    baseNode = filterNode;
+                }
+            }
+            // ADD THIS BLOCK ↑
+
+            dp[mask] = DPState(mask, 0.0, rows, baseNode, "SCAN", catalog->getSortedColumn(tableName));
         }
-    }
-    // ADD THIS BLOCK ↑
-
-    dp[mask] = DPState(mask, 0.0, rows, baseNode, "SCAN", catalog->getSortedColumn(tableName));
-}
 
         // Fill DP table for all subsets (process by increasing bit count)
         for (int bits = 2; bits <= n; bits++) {
@@ -240,7 +248,7 @@ public:
 
                         auto joinNode = std::make_shared<PlanNode>(JOIN);
                         joinNode->algorithm = (alg == "Hash") ? HASH : (alg == "BNLJ") ? BNLJ : MERGE;
-                        joinNode->condition = (foundPred) ? (leftTable + "." + leftCol + " = " + rightTable + "." + rightCol) : "CROSS PRODUCT";
+                        joinNode->condition = (foundPred) ? (pred_t1 + "." + pred_c1 + " = " + pred_t2 + "." + pred_c2) : "CROSS PRODUCT";
                         joinNode->left = dp[submask].plan;
                         joinNode->right = dp[rightMask].plan;
 

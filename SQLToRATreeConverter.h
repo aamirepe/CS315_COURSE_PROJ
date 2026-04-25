@@ -68,7 +68,7 @@ struct JoinNode : RANode {
 
 /**
  * Converts a SQL query string to an RA tree.
- * @param query The SQL query to parse
+ * @param query The SQL query to parse`
  * @return Pointer to the root of the RA tree, or nullptr on failure
  *         Caller is responsible for deleting the tree to free memory
  */
