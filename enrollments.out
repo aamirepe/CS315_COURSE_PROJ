@@ -5,6 +5,7 @@ TEST QUERY: SELECT * FROM enrollments
 Optimizer is processing heuristics and DP...
 
 OPTIMAL PHYSICAL PLAN (Tree):
+-> SCAN: enrollments
 
 JOIN SEQUENCE (Order of Operations):
 

@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <memory>
@@ -13,7 +15,33 @@
 #include "optimizer/PlanNode.h"
 #include "optimizer/ExecutionEngine.h"
 
-// Helper function to collect table names from a plan subtree
+// =============================================================================
+// TeeStreambuf: writes to two streams simultaneously (terminal + file)
+// =============================================================================
+class TeeStreambuf : public std::streambuf {
+    std::streambuf* primary;   // e.g. cout's buffer (terminal)
+    std::streambuf* secondary; // e.g. file buffer
+public:
+    TeeStreambuf(std::streambuf* p, std::streambuf* s) : primary(p), secondary(s) {}
+
+    int overflow(int c) override {
+        if (c == EOF) return !EOF;
+        primary->sputc(c);
+        secondary->sputc(c);
+        return c;
+    }
+
+    std::streamsize xsputn(const char* s, std::streamsize n) override {
+        primary->sputn(s, n);
+        secondary->sputn(s, n);
+        return n;
+    }
+};
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
 void collectTableNames(std::shared_ptr<PlanNode> node, std::vector<std::string>& tables) {
     if (!node) return;
     if (node->type == SCAN) {
@@ -24,7 +52,6 @@ void collectTableNames(std::shared_ptr<PlanNode> node, std::vector<std::string>&
     }
 }
 
-// Helper function to print the join sequence
 void printJoinSequence(std::shared_ptr<PlanNode> node, int& joinCounter) {
     if (!node) return;
 
@@ -56,41 +83,41 @@ void printJoinSequence(std::shared_ptr<PlanNode> node, int& joinCounter) {
     }
 }
 
+// =============================================================================
+// runTestQuery: runs a SQL query through optimizer + execution engine
+// All output goes to std::cout (which may be tee'd to a file by the caller)
+// =============================================================================
 void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog& cat) {
     std::cout << "\n==================================================================\n";
     std::cout << "TEST QUERY: " << query << "\n";
     std::cout << "------------------------------------------------------------------\n";
 
-    // 1. Parse SQL to RA Tree (to get basic structure)
+    // 1. Parse SQL to RA Tree
     RANode* raTree = parseSQLToRA(query);
     if (!raTree) {
         std::cout << "Parse failed!\n";
         return;
     }
 
-    // 2. Build JoinGraph from query
-    // In a full system, the SQLToRATreeConverter would do this.
-    // For testing, we manually simulate the extraction of tables and conditions.
+    // 2. Build JoinGraph from query (string-based extraction)
     JoinGraph graph;
 
-    // Simple logic to extract tables for our test cases
-    if (query.find("students") != std::string::npos) graph.base_tables.push_back("students");
-    if (query.find("grades") != std::string::npos) graph.base_tables.push_back("grades");
-    if (query.find("courses") != std::string::npos) graph.base_tables.push_back("courses");
-    if (query.find("enrollments") != std::string::npos) graph.base_tables.push_back("enrollments");
+    if (query.find("students")          != std::string::npos) graph.base_tables.push_back("students");
+    if (query.find("grades")            != std::string::npos) graph.base_tables.push_back("grades");
+    if (query.find("courses")           != std::string::npos) graph.base_tables.push_back("courses");
+    if (query.find("enrollments")       != std::string::npos) graph.base_tables.push_back("enrollments");
+    if (query.find("huge_users")        != std::string::npos) graph.base_tables.push_back("huge_users");
+    if (query.find("huge_transactions") != std::string::npos) graph.base_tables.push_back("huge_transactions");
 
-    // Mocking join conditions based on common test patterns
-    if (query.find("students.id = grades.student_id") != std::string::npos) {
+    if (query.find("students.id = grades.student_id")         != std::string::npos)
         graph.join_conditions.emplace_back("students", "id", "grades", "student_id");
-    }
-    if (query.find("enrollments.course_id = courses.id") != std::string::npos) {
+    if (query.find("enrollments.course_id = courses.id")      != std::string::npos)
         graph.join_conditions.emplace_back("enrollments", "course_id", "courses", "id");
-    }
-    if (query.find("students.id = enrollments.student_id") != std::string::npos) {
+    if (query.find("students.id = enrollments.student_id")    != std::string::npos)
         graph.join_conditions.emplace_back("students", "id", "enrollments", "student_id");
-    }
+    if (query.find("huge_users.id = huge_transactions.user_id") != std::string::npos)
+        graph.join_conditions.emplace_back("huge_users", "id", "huge_transactions", "user_id");
 
-    // Mocking Selection conditions (WHERE clause)
     if (query.find("WHERE") != std::string::npos) {
         size_t pos = query.find("WHERE");
         graph.selection_conditions.push_back(query.substr(pos + 6));
@@ -111,79 +138,112 @@ void runTestQuery(const std::string& query, const Optimizer& opt, const Catalog&
         std::cout << "Resulting Tuple Size: " << result.size << "\n";
         std::cout << "Best Algorithm Selected: " << result.bestAlg << "\n";
 
-        // --- Execute Query with Execution Engine ---
+        // --- Execute and print ALL rows ---
         std::cout << "\n--- EXECUTION ENGINE RESULTS ---\n";
         InMemoryDatabase execDb;
-        auto root = buildOperatorTree(*result.plan, execDb);
-        root->open();
-        Row* firstRow = root->next();
-        if (firstRow) {
-            std::cout << "First row columns: ";
-            for (auto& kv : *firstRow)
-                std::cout << kv.first << " ";
-            std::cout << std::endl;
-            delete firstRow;
-        } else {
-            std::cout << "No results.\n";
-        }
-        root->close();
+        executeAndPrintQuery(*result.plan, execDb, std::cout);
         std::cout << "-------------------------------\n";
     } else {
         std::cout << "Optimizer could not find a valid plan.\n";
     }
 
-    // Cleanup RA tree
-    // Note: In a real system, use a proper smart pointer or recursive delete
+    delete raTree;
 }
 
-int main() {
-    // Setup Database and Catalog
+// =============================================================================
+// main
+// =============================================================================
+int main(int argc, char* argv[]) {
     InMemoryDatabase db;
     Catalog catalog(&db);
     SizeEstimator sizeEst(&catalog);
     CostModel costModel;
     Optimizer optimizer(&catalog, &sizeEst, &costModel);
 
-    std::cout << "--- DBMS Heuristic Optimizer Test Suite ---\n";
+    std::string testFile = "test.txt";
+
+    // Single-query mode: ./optimizer_engine "SELECT ..."
+    if (argc >= 2) {
+        std::cout << "--- Running single query ---\n";
+        catalog.printStats();
+        runTestQuery(argv[1], optimizer, catalog);
+        return 0;
+    }
+
+    // Batch mode: read from test.txt
+    std::ifstream infile(testFile);
+    if (!infile.is_open()) {
+        std::cerr << "Could not open " << testFile << ". Running built-in default.\n";
+        catalog.printStats();
+        runTestQuery(
+            "SELECT * FROM students JOIN grades ON students.id = grades.student_id WHERE students.age = 20",
+            optimizer, catalog
+        );
+        return 0;
+    }
+
+    std::cout << "--- DBMS Heuristic Optimizer: Reading queries from " << testFile << " ---\n";
     catalog.printStats();
 
-    // Test Case 1: Simple Join with Filter (Tests Selection Push-Down)
-    runTestQuery(
-        "SELECT * FROM students JOIN grades ON students.id = grades.student_id WHERE students.age = 20",
-        optimizer, catalog
-    );
+    std::string line;
+    int lineNum   = 0;
+    int queryCount = 0;
 
-    // Test Case 2: 3-Table Join (Tests Join Ordering and Left-Deep constraint)
-    runTestQuery(
-        "SELECT * FROM students JOIN enrollments ON students.id = enrollments.student_id JOIN courses ON enrollments.course_id = courses.id",
-        optimizer, catalog
-    );
+    while (std::getline(infile, line)) {
+        lineNum++;
 
-    // Test Case 3: Cross Product (Tests Penalty Heuristic)
-    // Note: Using comma syntax as the sql-parser doesn't support CROSS JOIN keyword
-    runTestQuery(
-        "SELECT * FROM students, courses",
-        optimizer, catalog
-    );
+        // Skip blank lines and comments
+        if (line.empty() || line[0] == '#') continue;
 
-    // Test Case 4: 4-Table Join with Multiple Conditions (Complex Query)
-    runTestQuery(
-        "SELECT * FROM students "
-        "JOIN grades ON students.id = grades.student_id "
-        "JOIN enrollments ON students.id = enrollments.student_id "
-        "JOIN courses ON enrollments.course_id = courses.id "
-        "WHERE students.age > 18",
-        optimizer, catalog
-    );
+        size_t sep = line.find('|');
+        if (sep == std::string::npos) {
+            std::cerr << "[Line " << lineNum << "] Skipping (no '|' separator): " << line << "\n";
+            continue;
+        }
 
-    // // Test Case 5: 4-Table Join with Different Join Order
-    runTestQuery(
-        "SELECT * FROM courses "
-        "JOIN enrollments ON courses.id = enrollments.course_id "
-        "JOIN students ON enrollments.student_id = students.id "
-        "JOIN grades ON students.id = grades.student_id",
-        optimizer, catalog
-    );
+        std::string label = line.substr(0, sep);
+        std::string query = line.substr(sep + 1);
+
+        auto trim = [](std::string& s) {
+            size_t start = s.find_first_not_of(" \t\r");
+            size_t end   = s.find_last_not_of(" \t\r");
+            s = (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+        };
+        trim(label);
+        trim(query);
+        if (query.empty()) continue;
+
+        queryCount++;
+        std::cout << "\n[" << queryCount << "] Label: " << label << "\n";
+
+        // Open output file for this label
+        std::ofstream outfile(label + ".out");
+
+        if (outfile.is_open()) {
+            // Tee: redirect cout so it writes to BOTH the terminal and the .out file
+            std::streambuf* originalCout = std::cout.rdbuf();
+            TeeStreambuf tee(originalCout, outfile.rdbuf());
+            std::cout.rdbuf(&tee);
+
+            runTestQuery(query, optimizer, catalog);
+
+            // Restore cout to terminal only
+            std::cout.rdbuf(originalCout);
+            outfile.close();
+        } else {
+            // Can't open file — just print to terminal
+            std::cerr << "Warning: could not open " << label << ".out for writing\n";
+            runTestQuery(query, optimizer, catalog);
+        }
+    }
+
+    infile.close();
+
+    if (queryCount == 0) {
+        std::cout << "No valid queries found in " << testFile << ".\n";
+    } else {
+        std::cout << "\n--- Done. Ran " << queryCount << " queries from " << testFile << " ---\n";
+    }
 
     return 0;
 }

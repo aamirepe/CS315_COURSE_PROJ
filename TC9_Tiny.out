@@ -5,9 +5,13 @@ TEST QUERY: SELECT * FROM students JOIN grades ON students.id = grades.student_i
 Optimizer is processing heuristics and DP...
 
 OPTIMAL PHYSICAL PLAN (Tree):
+-> JOIN (BNLJ): students.id = grades.student_id
+   [EXECUTION: EXECUTE_BNLJ ON students.id = grades.student_id]
+    -> SCAN: grades
+    -> SCAN: students
 
 JOIN SEQUENCE (Order of Operations):
-  Join 1: [grades] X [students] ON grades.student_id = students.id (BNLJ)
+  Join 1: [grades] X [students] ON students.id = grades.student_id (BNLJ)
 
 Estimated Cost: 20.6
 Resulting Tuple Size: 500
@@ -15,6 +19,105 @@ Best Algorithm Selected: BNLJ
 
 --- EXECUTION ENGINE RESULTS ---
 grades.course	grades.grade	grades.student_id	students.age	students.id	students.name	
+CS1	61	2	19	1	Student1	
 CS1	61	2	20	2	Student2	
-1 row(s) returned.
+CS1	61	2	21	3	Student3	
+CS1	61	2	22	4	Student4	
+CS1	61	2	18	5	Student5	
+CS1	61	2	19	6	Student6	
+CS1	61	2	20	7	Student7	
+CS1	61	2	21	8	Student8	
+CS1	61	2	22	9	Student9	
+CS1	61	2	18	10	Student10	
+CS1	61	2	19	11	Student11	
+CS1	61	2	20	12	Student12	
+CS1	61	2	21	13	Student13	
+CS1	61	2	22	14	Student14	
+CS1	61	2	18	15	Student15	
+CS1	61	2	19	16	Student16	
+CS1	61	2	20	17	Student17	
+CS1	61	2	21	18	Student18	
+CS1	61	2	22	19	Student19	
+CS1	61	2	18	20	Student20	
+CS1	61	2	19	21	Student21	
+CS1	61	2	20	22	Student22	
+CS1	61	2	21	23	Student23	
+CS1	61	2	22	24	Student24	
+CS1	61	2	18	25	Student25	
+CS1	61	2	19	26	Student26	
+CS1	61	2	20	27	Student27	
+CS1	61	2	21	28	Student28	
+CS1	61	2	22	29	Student29	
+CS1	61	2	18	30	Student30	
+CS1	61	2	19	31	Student31	
+CS1	61	2	20	32	Student32	
+CS1	61	2	21	33	Student33	
+CS1	61	2	22	34	Student34	
+CS1	61	2	18	35	Student35	
+CS1	61	2	19	36	Student36	
+CS1	61	2	20	37	Student37	
+CS1	61	2	21	38	Student38	
+CS1	61	2	22	39	Student39	
+CS1	61	2	18	40	Student40	
+CS1	61	2	19	41	Student41	
+CS1	61	2	20	42	Student42	
+CS1	61	2	21	43	Student43	
+CS1	61	2	22	44	Student44	
+CS1	61	2	18	45	Student45	
+CS1	61	2	19	46	Student46	
+CS1	61	2	20	47	Student47	
+CS1	61	2	21	48	Student48	
+CS1	61	2	22	49	Student49	
+CS1	61	2	18	50	Student50	
+CS1	61	2	19	51	Student51	
+CS1	61	2	20	52	Student52	
+CS1	61	2	21	53	Student53	
+CS1	61	2	22	54	Student54	
+CS1	61	2	18	55	Student55	
+CS1	61	2	19	56	Student56	
+CS1	61	2	20	57	Student57	
+CS1	61	2	21	58	Student58	
+CS1	61	2	22	59	Student59	
+CS1	61	2	18	60	Student60	
+CS1	61	2	19	61	Student61	
+CS1	61	2	20	62	Student62	
+CS1	61	2	21	63	Student63	
+CS1	61	2	22	64	Student64	
+CS1	61	2	18	65	Student65	
+CS1	61	2	19	66	Student66	
+CS1	61	2	20	67	Student67	
+CS1	61	2	21	68	Student68	
+CS1	61	2	22	69	Student69	
+CS1	61	2	18	70	Student70	
+CS1	61	2	19	71	Student71	
+CS1	61	2	20	72	Student72	
+CS1	61	2	21	73	Student73	
+CS1	61	2	22	74	Student74	
+CS1	61	2	18	75	Student75	
+CS1	61	2	19	76	Student76	
+CS1	61	2	20	77	Student77	
+CS1	61	2	21	78	Student78	
+CS1	61	2	22	79	Student79	
+CS1	61	2	18	80	Student80	
+CS1	61	2	19	81	Student81	
+CS1	61	2	20	82	Student82	
+CS1	61	2	21	83	Student83	
+CS1	61	2	22	84	Student84	
+CS1	61	2	18	85	Student85	
+CS1	61	2	19	86	Student86	
+CS1	61	2	20	87	Student87	
+CS1	61	2	21	88	Student88	
+CS1	61	2	22	89	Student89	
+CS1	61	2	18	90	Student90	
+CS1	61	2	19	91	Student91	
+CS1	61	2	20	92	Student92	
+CS1	61	2	21	93	Student93	
+CS1	61	2	22	94	Student94	
+CS1	61	2	18	95	Student95	
+CS1	61	2	19	96	Student96	
+CS1	61	2	20	97	Student97	
+CS1	61	2	21	98	Student98	
+CS1	61	2	22	99	Student99	
+CS1	61	2	18	100	Student100	
+100 row(s) returned.
 -------------------------------

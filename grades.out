@@ -5,6 +5,7 @@ TEST QUERY: SELECT * FROM grades
 Optimizer is processing heuristics and DP...
 
 OPTIMAL PHYSICAL PLAN (Tree):
+-> SCAN: grades
 
 JOIN SEQUENCE (Order of Operations):
 

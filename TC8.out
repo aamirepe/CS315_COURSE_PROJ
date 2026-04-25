@@ -5,11 +5,22 @@ TEST QUERY: SELECT * FROM students JOIN grades ON students.id = grades.student_i
 Optimizer is processing heuristics and DP...
 
 OPTIMAL PHYSICAL PLAN (Tree):
+-> JOIN (BNLJ): students.id = grades.student_id
+   [EXECUTION: EXECUTE_BNLJ ON students.id = grades.student_id]
+    -> JOIN (BNLJ): students.id = enrollments.student_id
+       [EXECUTION: EXECUTE_BNLJ ON students.id = enrollments.student_id]
+        -> JOIN (BNLJ): enrollments.course_id = courses.id
+           [EXECUTION: EXECUTE_BNLJ ON enrollments.course_id = courses.id]
+            -> SCAN: enrollments
+            -> SCAN: courses
+        -> FILTER: students.age > 18
+            -> SCAN: students
+    -> SCAN: grades
 
 JOIN SEQUENCE (Order of Operations):
   Join 1: [enrollments] X [courses] ON enrollments.course_id = courses.id (BNLJ)
-  Join 2: [enrollments,courses] X [students] ON enrollments.student_id = students.id (BNLJ)
-  Join 3: [enrollments,courses,students] X [grades] ON students.id = grades.student_id (BNLJ)
+  Join 2: [enrollments,courses] X [] ON students.id = enrollments.student_id (BNLJ)
+  Join 3: [enrollments,courses] X [grades] ON students.id = grades.student_id (BNLJ)
 
 Estimated Cost: 61
 Resulting Tuple Size: 500
@@ -17,10 +28,10 @@ Best Algorithm Selected: BNLJ
 
 --- EXECUTION ENGINE RESULTS ---
 courses.id	courses.title	enrollments.course_id	enrollments.semester	enrollments.student_id	grades.course	grades.grade	grades.student_id	students.age	students.id	students.name	
-CS1	Course1	CS1	Fall2024	2	CS1	61	2	20	2	Student2	
-CS1	Course1	CS1	Fall2024	2	CS1	79	2	20	2	Student2	
-CS1	Course1	CS1	Fall2024	2	CS1	97	2	20	2	Student2	
-CS1	Course1	CS1	Fall2024	2	CS1	74	2	20	2	Student2	
-CS1	Course1	CS1	Fall2024	2	CS1	92	2	20	2	Student2	
+CS1	Course1	CS1	Fall2024	2	CS0	78	1	19	1	Student1	
+CS1	Course1	CS1	Fall2024	2	CS0	96	1	19	1	Student1	
+CS1	Course1	CS1	Fall2024	2	CS0	73	1	19	1	Student1	
+CS1	Course1	CS1	Fall2024	2	CS0	91	1	19	1	Student1	
+CS1	Course1	CS1	Fall2024	2	CS0	68	1	19	1	Student1	
 5 row(s) returned.
 -------------------------------

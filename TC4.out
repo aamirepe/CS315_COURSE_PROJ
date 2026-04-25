@@ -5,6 +5,7 @@ TEST QUERY: SELECT * FROM courses WHERE id = CS2
 Optimizer is processing heuristics and DP...
 
 OPTIMAL PHYSICAL PLAN (Tree):
+-> SCAN: courses
 
 JOIN SEQUENCE (Order of Operations):
 
@@ -14,6 +15,15 @@ Best Algorithm Selected: SCAN
 
 --- EXECUTION ENGINE RESULTS ---
 courses.id	courses.title	
+CS1	Course1	
 CS2	Course2	
-1 row(s) returned.
+CS3	Course3	
+CS4	Course4	
+CS5	Course5	
+CS6	Course6	
+CS7	Course7	
+CS8	Course8	
+CS9	Course9	
+CS10	Course10	
+10 row(s) returned.
 -------------------------------

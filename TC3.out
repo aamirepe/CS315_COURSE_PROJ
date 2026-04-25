@@ -5,6 +5,7 @@ TEST QUERY: SELECT * FROM courses
 Optimizer is processing heuristics and DP...
 
 OPTIMAL PHYSICAL PLAN (Tree):
+-> SCAN: courses
 
 JOIN SEQUENCE (Order of Operations):
 
